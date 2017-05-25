@@ -21,8 +21,7 @@ ds_long <- ds %>%
   filter(!time %in% c(1, 5)) %>%
   mutate(
     day.f = factor(day, c(0, 4, 6, 8, 12)),
-    group.f = factor(group, c(1, 2)),
-    group.f2 = ifelse(group == 1, "repetitions", "weight") %>% factor(c("repetitions", "weight")),
+    group.f = ifelse(group == 1, "repetitions", "weight") %>% factor(c("repetitions", "weight")),
     newtime = case_when(
       .$time == 0 ~ 1,
       .$time == 2 ~ 2,
@@ -34,10 +33,10 @@ ds_long <- ds %>%
 
 # let's make a plot of the data
 ds_long_summary <- ds_long  %>%
-  group_by(group.f2, day) %>%
+  group_by(group.f, day) %>%
   summarize(mean_strength = mean(muscle_strength, na.rm = TRUE))
 
-p1 <- ggplot(ds_long_summary, aes(x = as.integer(day), y = mean_strength, color = group.f2)) +
+p1 <- ggplot(ds_long_summary, aes(x = as.integer(day), y = mean_strength, color = group.f)) +
   geom_line() +
   geom_point(size = 2) +
   labs(y = "mean strength", x = "day", color = "method")
@@ -62,4 +61,11 @@ model3 <- gls(muscle_strength ~ group.f * day.f,
   data = ds_long,
   na.action = na.omit,
   corr = corExp(, form = ~ day | id)
+)
+
+# testing unstructured with no weight argument
+test <- gls(muscle_strength ~ group.f * day.f, 
+  data = ds_long,
+  na.action = na.omit,
+  corr = corSymm(, form = ~ newtime | id)
 )

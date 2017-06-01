@@ -133,7 +133,7 @@ model_info <- tibble(model_id = c(1, 2, 3, 4, 5), models = models) %>%
 
 # 7.1.4 Given the choice of model for the covariance from Problem 7.1.3, treat age (or time) as a cateogrical variable and fit a model that includes the effects of age, gender, and their interactions. Determine whether the pattern of change over tiem is different for boys and girls.
 
-# We first need to check if there is an interaction effect before looking if there is a gender effect. According to anova, there is not a significant interaction effect at the 0.05 level (p = 0.0759). There is a significant gender effect (p = 0.0029). The coefficient genderM = 1.69 meaning males have a greater distance than females.
+# We first need to check if there is an interaction effect before looking if there is a gender effect. According to anova, there is not a significant interaction effect at the 0.05 level (p = 0.0759). There is a significant gender effect (p = 0.0029). The coefficient genderM = 1.69 meaning males have a greater distance than females. CORRECTION: The question asks for a pattern of change over time is different for boys and girls. Since we are looking at the pattern of change over time, this implies the interaction and not a gender effect.
 
 # 7.1.5 Show how the estimated regression coefficients from Problem 7.1.4 can be used to estimate the means in the two groups at ages 8 and 14.
 
@@ -182,8 +182,104 @@ p3 <- ggplot(grid, aes(age, pred, color = gender)) +
 
 # 7.1.8 Show how the regression coefficients from Problem 7.1.6 can be used to estimate the means in the two groups at ages 8 and 14.
 
+m_age_coef <- coefficients(m_age)
+m_age_estimated <- tribble(
+  ~ gender, ~ age, ~ pred_distance,
+  "F", 8, m_age_coef[1] + m_age_coef[2] * 8,
+  "F", 14, m_age_coef[1] + m_age_coef[2] * 14,
+  "M", 8, m_age_coef[1] + m_age_coef[2] * 8 + m_age_coef[3] + m_age_coef[4] * 8,
+  "M", 14, m_age_coef[1] + m_age_coef[2] * 14 + m_age_coef[3] + m_age_coef[4] * 14
+) %>% left_join(mean_summary, by = c("gender", "age")) %>% mutate(diff = distance - pred_distance)
+
 # 7.1.9 Does a model with only a linear trend in age adequately account for the pattern of change in the two groups?
+# In my opinion, yes. The curves from p3 fit the mean of the data well. One issue is the age:genderM regressors is very correlated with genderM (r = 0.669). This is expected, but not a huge problem. The means are well estimated as well shown from problem 7.1.8. It also uses a reasonable number of parameters so there is no overfitting.
 
 # 7.1.10 The third mease (at age 12) on subject ID = 20 is a potential outlier. Repeat the analyses in Problems 7.1.3, 7.1.4, 7.1.6 and 7.1.9 excluding the third measure on subject ID = 20. Do the substantive conclusions change?
+data_long_exclude <- filter(data_long, id != 20 | time != 3)
+
+## 7.1.3
+
+models_exclude <- vector(mode = "list", length = 5)
+
+# (a) unstructured covariance
+models_exclude[[1]] <- gls(
+  distance ~ age.f * gender,
+  corr = corSymm(form = ~ time | id),
+  data = data_long_exclude,
+  weights = varIdent(form = ~ 1 | time)
+)
+
+# (b) compound symmetry - corresponds to uniform correlation
+models_exclude[[2]] <- gls(
+  distance ~ age.f * gender,
+  corr = corCompSymm(form = ~ time | id),
+  data = data_long_exclude
+)
+
+# (c) heterogenous compound symmetry
+models_exclude[[3]] <- gls(
+  distance ~ age.f * gender,
+  corr = corCompSymm(form = ~ time | id),
+  data = data_long_exclude,
+  weights = varIdent(form = ~ 1 | time)
+)
+
+# (d) ar1
+models_exclude[[4]] <- gls(
+  distance ~ age.f * gender,
+  corr = corAR1(form = ~ time | id),
+  data = data_long_exclude
+)
+
+# (e) heterogeneous ar1
+models_exclude[[5]] <- gls(
+  distance ~ age.f * gender,
+  corr = corAR1(form = ~ time | id),
+  data = data_long_exclude,
+  weights = varIdent(form = ~ 1 | time)
+)
+
+model_info_exclude <- tibble(model_id = c(1, 2, 3, 4, 5), models = models_exclude) %>%
+  mutate(
+    bic = map_dbl(models, ~ summary(.)$BIC),
+    aic = map_dbl(models, ~ summary(.)$AIC),
+    log_lik = map_dbl(models, ~ summary(.)$logLik)
+  )
+
+# unstructured covariance looks like the best covariance model
+
+## 7.1.4 
+# The pattern of change over time is different for boys and girls. There is a significant interaction effect at the 0.05 level (p = 0.0212).
+
+## 7.1.6
+m_age_exclude <- gls(
+  distance ~ age * gender,
+  corr = corCompSymm(form = ~ time | id),
+  data = data_long_exclude
+)
+
+# There is an interaction between age and gender at the 0.05 level (p = 0.0094).
+
+## 7.1.9
+m_age_exclude_coef <- coefficients(m_age_exclude)
+m_age_exclude_estimated <- tribble(
+  ~ gender, ~ age, ~ pred_distance,
+  "F", 8, m_age_coef[1] + m_age_coef[2] * 8,
+  "F", 14, m_age_coef[1] + m_age_coef[2] * 14,
+  "M", 8, m_age_coef[1] + m_age_coef[2] * 8 + m_age_coef[3] + m_age_coef[4] * 8,
+  "M", 14, m_age_coef[1] + m_age_coef[2] * 14 + m_age_coef[3] + m_age_coef[4] * 14
+) %>% left_join(mean_summary, by = c("gender", "age")) %>% mutate(diff = distance - pred_distance)
+
+grid <- data_grid(data_long_exclude, gender, age) %>%
+  add_predictions(m_age_exclude) %>%
+  left_join(data_long_summary, by = c("gender", "age"))
+p4 <- ggplot(grid, aes(age, pred, color = gender)) +
+  geom_line(size = 1.5) +
+  geom_point(aes(y = distance), size = 4, show.legend = FALSE)
+
+# In my opinion, yes. The curves from p4 fit the mean of the data well. One issue is the age:genderM regressors is very correlated with genderM (r = 0.644). This is expected, but not a huge problem. The means are well estimated as well shown from problem 7.1.8. It also uses a reasonable number of parameters so there is no overfitting.
 
 # 7.1.11 Given the results of all the previous analyses, what conclusions can be drawn about gender differences in patterns of dental growth?
+# Distances increase as age increases.
+# Males have larger distances than females.
+# There is probably an interaction between age and males effecting distance.

@@ -133,7 +133,8 @@ model2 <- lme(
 # (0.17 - 1.96 * 0.15, 0.17 + 1.96 * 0.15) = (-0.124, 0.464). This interval is entirely
 # within group1 rate of increase, hence it is not significant.
 
-# 8.1.4 Is a model with only randomly varying intercepts defensible? Explain.
+# 8.1.4 
+# Is a model with only randomly varying intercepts defensible? Explain.
 model3 <- lme(
   strength ~ group_label * day_num,
   data = exercise,
@@ -144,16 +145,50 @@ model3 <- lme(
 # the slope day_num, but not nearly as much as the intercept. When performing an anova
 # between model1 and model3, model1 is better in terms of AIC, BIC, and logLik.
 
-# 8.1.5 What are teh mean intercept and slope in the two exercise programs?
+# 8.1.5 
+# What are teh mean intercept and slope in the two exercise programs?
 # Program1 intercept = 80.1
 # Program1 slope     = 0.12
 # Program2 intercept = 80.1 + 1.3 = 81.4
 # Program2 slope     = 0.12 + 0.049 = 0.169
 
-# 8.16 Based on teh previous analysis, interpret the effect of treatment on chagnes in
+# 8.16 
+# Based on teh previous analysis, interpret the effect of treatment on chagnes in
 # strength. Does your analysis suggest a difference between the two groups?
 # There is not a difference of baseline strength between the two groups (p = 0.2901).
 # Tehre is not a difference of strength change between tht two groups (p = 0.4815)
 
-# 8.1.7 What is the estimate of Var(Yi1|bi)? What is the estimate of Var(Yi1)? Explain
+# 8.1.7 
+# What is the estimate of Var(Yi1|bi)? What is the estimate of Var(Yi1)? Explain
 # the difference.
+# Cov(Yi|bi) = Ri = sigma^2 * I_ni
+# Cov(Yi) = ZiGZi' + sigma^2 * I_ni
+# so that Var(Yi1|bi) = sigma^2 and Var(Yi1) = a long equation dependent on time, grouping, 
+# and G Var(Yi1|bi) is the deviation of the first measurement from the specific participant's
+# mean response profile. Var(Yi1) is the deviation of the first measurement from the 
+# population mean response profile. It accounts for the correlation for a participant's 
+# measurements.
+
+# 8.1.8 
+# Obtain the predicted (emrirical BLUP) intercept and slope for each subject.
+bs <- coefficients(model1)
+
+# 8.1.9
+# Using any standard linear regression procedure, obtain the ordinary least squares
+# (OLS) estiamtes of the intercept and slpe from the regression of strength on
+# time (in days) for subject 24 (ID = 24)l. That is rescrite the analysis to data on
+# subject 24 only and estimate that subject's intercept and slope.
+data_24 <- exercise %>%
+  filter(id == 24) 
+ols_24 <- lm(strength ~ day_num, data = data_24)
+
+# 8.1.10
+# For subject 24 (ID = 24), compare the predicted intercepts and slopes obtained
+# in Problems 8.1.8 and 8.1.9. How and why might these differ?
+# ols intercept = 87.8
+# ols slope     = 0.45
+# lme intercept = 86.94 + 1.27 = 88.21
+# lme slope     = 0.372 + (-0.05195) = 0.32
+# For lme model, intercept and group share variance, so some of it might be lost hence the
+# lower final intercept value compared with ols model. This is the same with the slopes.
+
